@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="th" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>myTCAS ViewTracker — ระบบจัดอันดับและเปรียบเทียบยอดวิวทุกสาขาทั่วประเทศ</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- Google Fonts: Prompt & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            tcas: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#4f46e5',
+              600: '#4338ca',
+              700: '#3730a3',
+              900: '#1e1b4b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+    .virtual-viewport { height: 680px; overflow-y: auto; position: relative; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-indigo-600 selection:text-white">
+
+  <!-- Top Navigation & Live Status Banner -->
+  <header class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 font-bold text-xl shadow-inner">
+          TC
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg sm:text-xl font-bold tracking-tight">myTCAS ViewTracker</h1>
+            <span id="dataSourceBadge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+              กำลังโหลดข้อมูล...
+            </span>
+          </div>
+          <p class="text-xs text-slate-300">ระบบจัดอันดับและเปรียบเทียบยอดผู้เข้าชมทุกหลักสูตรทั่วประเทศ (อัปเดต 06:00 / 18:00 น.)</p>
+        </div>
+      </div>
+
+      <!-- Countdown & Last Update -->
+      <div class="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
+        <div class="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-300">อัปเดตล่าสุด:</span>
+          <span id="lastUpdatedText" class="font-mono font-semibold text-white">-</span>
+        </div>
+        <div class="bg-indigo-600/30 border border-indigo-400/30 rounded-lg px-3 py-1.5 flex items-center gap-2">
+          <span class="text-indigo-200">รอบถัดไปในอีก:</span>
+          <span id="countdownTimer" class="font-mono font-bold text-amber-300">--:--:--</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Summary KPI Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80">
+        <p class="text-xs font-medium text-slate-500 uppercase">หลักสูตรที่พบ / ทั้งหมด</p>
+        <div class="mt-1 flex items-baseline gap-2">
+          <span id="statFilteredPrograms" class="text-2xl sm:text-3xl font-bold text-slate-900 font-mono">0</span>
+          <span id="statTotalPrograms" class="text-xs text-slate-400 font-mono">/ 0 สาขา</span>
+        </div>
+        <p id="statTotalUniversities" class="mt-1 text-xs text-indigo-600 font-medium">ครอบคลุม 0 สถาบันทั่วประเทศ</p>
+      </div>
+
+      <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80">
+        <p class="text-xs font-medium text-slate-500 uppercase">ยอดผู้เข้าชมรวม (ตามตัวกรอง)</p>
+        <div class="mt-1 flex items-baseline gap-2">
+          <span id="statTotalViews" class="text-2xl sm:text-3xl font-bold text-indigo-600 font-mono">0</span>
+          <span class="text-xs text-slate-500">ครั้ง</span>
+        </div>
+        <p id="statViewsDiff" class="mt-1 text-xs text-emerald-600 font-medium">+0 จากรอบก่อนหน้า</p>
+      </div>
+
+      <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80">
+        <p class="text-xs font-medium text-slate-500 uppercase">จำนวนรับรวม 4 รอบ</p>
+        <div class="mt-1 flex items-baseline gap-2">
+          <span id="statTotalSeats" class="text-2xl sm:text-3xl font-bold text-slate-900 font-mono">0</span>
+          <span class="text-xs text-slate-500">ที่นั่ง</span>
+        </div>
+        <p id="statAvgViewsPerSeat" class="mt-1 text-xs text-slate-500">เฉลี่ย 0 วิว/ที่นั่ง</p>
+      </div>
+
+      <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80">
+        <p class="text-xs font-medium text-slate-500 uppercase">สาขายอดวิวสูงสุด (อันดับ 1)</p>
+        <p id="statTopCourseName" class="mt-1 text-sm font-bold text-slate-900 truncate" title="-">-</p>
+        <p id="statTopCourseUni" class="text-xs text-amber-600 font-semibold truncate mt-0.5">-</p>
+      </div>
+    </section>
+
+    <!-- Dynamic Chart Section (Top 10 / Top 25 / Top 50) -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 sm:p-6">
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+            <span>📊 กราฟจัดอันดับสาขายอดผู้เข้าชมสูงสุด</span>
+            <span id="chartFilterStatus" class="text-xs font-normal text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">ทั้งประเทศ</span>
+          </h2>
+          <p class="text-xs text-slate-500">ปรับเปลี่ยนอัตโนมัติตามคำค้นหา มหาวิทยาลัย และกลุ่มคณะที่เลือกด้านล่าง</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs font-medium">
+            <button type="button" data-chart-limit="10" class="chart-limit-btn px-3 py-1.5 rounded-md bg-indigo-600 text-white shadow-sm">Top 10</button>
+            <button type="button" data-chart-limit="25" class="chart-limit-btn px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900">Top 25</button>
+            <button type="button" data-chart-limit="50" class="chart-limit-btn px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900">Top 50</button>
+          </div>
+          <button id="toggleChartBtn" type="button" class="text-xs text-slate-500 hover:text-slate-800 px-2.5 py-1.5 border border-slate-200 rounded-lg">
+            ซ่อน/แสดงกราฟ
+          </button>
+        </div>
+      </div>
+
+      <div id="chartWrapper" class="relative w-full h-80 sm:h-96">
+        <canvas id="topViewsChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Filter & Search Control Bar -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 space-y-4 sticky top-[68px] z-30">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+        <!-- Debounced Search -->
+        <div class="md:col-span-4 relative">
+          <label for="searchInput" class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">ค้นหาด่วน (Debounce Search)</label>
+          <div class="relative">
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="รหัสสาขา, ชื่อสาขา, คณะ, มหาวิทยาลัย..."
+              class="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
+            />
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <button id="clearSearchBtn" type="button" class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+          </div>
+        </div>
+
+        <!-- University Filter -->
+        <div class="md:col-span-3">
+          <label for="universityFilter" class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">กรองตามมหาวิทยาลัย</label>
+          <select id="universityFilter" class="w-full py-2 px-3 text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none bg-white">
+            <option value="">ทุกมหาวิทยาลัยทั่วประเทศ</option>
+          </select>
+        </div>
+
+        <!-- Category / Faculty Group Filter -->
+        <div class="md:col-span-3">
+          <label for="categoryFilter" class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">กรองตามกลุ่มคณะ</label>
+          <select id="categoryFilter" class="w-full py-2 px-3 text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none bg-white">
+            <option value="">ทุกกลุ่มคณะ / สาขาวิชา</option>
+            <option value="แพทย์ / ทันตะ / เภสัช / สัตวแพทย์">แพทย์ / ทันตะ / เภสัช / สัตวแพทย์</option>
+            <option value="พยาบาล / สหเวช / สุขภาพ">พยาบาล / สหเวช / สุขภาพ</option>
+            <option value="วิศวกรรมศาสตร์">วิศวกรรมศาสตร์</option>
+            <option value="วิทยาการคอม / IT / ดิจิทัล">วิทยาการคอม / IT / ดิจิทัล</option>
+            <option value="บริหารธุรกิจ / บัญชี">บริหารธุรกิจ / บัญชี</option>
+            <option value="เศรษฐศาสตร์">เศรษฐศาสตร์</option>
+            <option value="นิติศาสตร์ / รัฐศาสตร์">นิติศาสตร์ / รัฐศาสตร์</option>
+            <option value="มนุษยศาสตร์ / ศิลปศาสตร์ / ภาษา">มนุษยศาสตร์ / ศิลปศาสตร์ / ภาษา</option>
+            <option value="ครุศาสตร์ / ศึกษาศาสตร์">ครุศาสตร์ / ศึกษาศาสตร์</option>
+            <option value="สถาปัตย์ / ศิลปกรรม / นิเทศศาสตร์">สถาปัตย์ / ศิลปกรรม / นิเทศศาสตร์</option>
+            <option value="เกษตรศาสตร์ / อุตสาหกรรมเกษตร">เกษตรศาสตร์ / อุตสาหกรรมเกษตร</option>
+            <option value="วิทยาศาสตร์">วิทยาศาสตร์</option>
+            <option value="อื่นๆ / สหวิทยาการ">อื่นๆ / สหวิทยาการ</option>
+          </select>
+        </div>
+
+        <!-- Sort Option -->
+        <div class="md:col-span-2">
+          <label for="sortSelect" class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">เรียงลำดับตาม</label>
+          <select id="sortSelect" class="w-full py-2 px-2.5 text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none bg-white">
+            <option value="views_desc">ยอดวิว (มาก → น้อย)</option>
+            <option value="diff_desc">ยอดวิวพุ่งแรง (+Diff)</option>
+            <option value="seats_desc">จำนวนรับรวม (มาก → น้อย)</option>
+            <option value="ratio_desc">อัตราแข่งขัน (วิว/ที่นั่ง)</option>
+            <option value="r1_desc">รับรอบ 1 Portfolio สูงสุด</option>
+            <option value="r3_desc">รับรอบ 3 Admission สูงสุด</option>
+            <option value="views_asc">ยอดวิว (น้อย → มาก)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Toolbar: View Mode, Render Mode (Pagination vs Virtual Scroll), Export CSV -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Display Mode: Table vs Card -->
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+            <button id="viewTableBtn" type="button" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white font-medium">
+              📋 ตาราง (Table)
+            </button>
+            <button id="viewCardBtn" type="button" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 font-medium">
+              📱 การ์ด (Card View)
+            </button>
+          </div>
+
+          <!-- Performance Mode: Pagination vs Virtual Scroll -->
+          <div class="inline-flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg">
+            <span class="text-slate-500">โหมดแสดงผล:</span>
+            <select id="pageSizeSelect" class="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer">
+              <option value="50">แบ่งหน้า 50 รายการ</option>
+              <option value="100" selected>แบ่งหน้า 100 รายการ</option>
+              <option value="200">แบ่งหน้า 200 รายการ</option>
+              <option value="virtual">Virtual Scroll (เลื่อนต่อเนื่อง 5,000+ แถว)</option>
+            </select>
+          </div>
+
+          <button id="resetFiltersBtn" type="button" class="text-slate-500 hover:text-indigo-600 underline px-2 py-1">
+            ล้างตัวกรองทั้งหมด
+          </button>
+        </div>
+
+        <!-- Export CSV UTF-8 with BOM -->
+        <div class="flex items-center gap-2">
+          <button
+            id="exportCsvBtn"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition"
+          >
+            <span>📥 ส่งออก Excel / CSV (UTF-8 BOM)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Data Display Container -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+      <!-- Table View -->
+      <div id="tableViewContainer" class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-900 text-slate-200 text-xs uppercase tracking-wider">
+              <th class="py-3.5 px-3 text-center w-16">อันดับ</th>
+              <th class="py-3.5 px-4">หลักสูตร / สาขาวิชา</th>
+              <th class="py-3.5 px-3">คณะ / สถาบัน</th>
+              <th class="py-3.5 px-2 text-center">รอบ 1</th>
+              <th class="py-3.5 px-2 text-center">รอบ 2</th>
+              <th class="py-3.5 px-2 text-center">รอบ 3</th>
+              <th class="py-3.5 px-2 text-center">รอบ 4</th>
+              <th class="py-3.5 px-3 text-center">รับรวม</th>
+              <th class="py-3.5 px-4 text-right">ยอดผู้เข้าชม (ครั้ง)</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-200 text-sm"></tbody>
+        </table>
+      </div>
+
+      <!-- Virtual Scroll Container (Active when mode = virtual) -->
+      <div id="virtualScrollViewport" class="virtual-viewport hidden">
+        <div id="virtualScrollSpacer" class="w-full relative">
+          <table class="w-full text-left border-collapse absolute top-0 left-0">
+            <tbody id="virtualTableBody" class="divide-y divide-slate-200 text-sm bg-white"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Mobile / Card View -->
+      <div id="cardViewContainer" class="hidden p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+      <!-- Pagination Footer -->
+      <div id="paginationFooter" class="bg-slate-50 px-4 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm">
+        <div id="paginationInfo" class="text-slate-600 font-medium">
+          แสดง 0 - 0 จากทั้งหมด 0 รายการ
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="firstPageBtn" class="px-2.5 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40">« หน้าแรก</button>
+          <button id="prevPageBtn" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40">‹ ก่อนหน้า</button>
+          <span id="pageIndicator" class="px-3 py-1.5 font-mono font-semibold text-slate-800">1 / 1</span>
+          <button id="nextPageBtn" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40">ถัดไป ›</button>
+          <button id="lastPageBtn" class="px-2.5 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40">ท้ายสุด »</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-xs text-slate-400">
+    <p>myTCAS ViewTracker — ประมวลผลข้อมูลสาธารณะจาก course.mytcas.com อัตโนมัติด้วย GitHub Actions วันละ 2 รอบ (06:00 น. และ 18:00 น.)</p>
+  </footer>
+
+  <!-- Application Script -->
+  <script>
+    // =========================================================================
+    // 1. State Management
+    // =========================================================================
+    const state = {
+      allPrograms: [],
+      filteredPrograms: [],
+      metadata: {},
+      searchQuery: '',
+      selectedUniversity: '',
+      selectedCategory: '',
+      sortBy: 'views_desc',
+      viewMode: 'table',       // 'table' | 'card'
+      pageSize: 100,           // 50 | 100 | 200 | 'virtual'
+      currentPage: 1,
+      chartLimit: 10,
+      virtualRowHeight: 68,
+    };
+
+    let chartInstance = null;
+
+    // =========================================================================
+    // 2. Fallback Realistic Generator (5,200+ Programs) หากยังไม่มีไฟล์ data.json
+    // =========================================================================
+    function generateFallbackDataset() {
+      const universities = [
+        ['001', 'จุฬาลงกรณ์มหาวิทยาลัย'],
+        ['002', 'มหาวิทยาลัยเกษตรศาสตร์'],
+        ['003', 'มหาวิทยาลัยขอนแก่น'],
+        ['004', 'มหาวิทยาลัยเชียงใหม่'],
+        ['005', 'มหาวิทยาลัยธรรมศาสตร์'],
+        ['006', 'มหาวิทยาลัยมหิดล'],
+        ['007', 'มหาวิทยาลัยศรีนครินทรวิโรฒ'],
+        ['008', 'มหาวิทยาลัยศิลปากร'],
+        ['009', 'มหาวิทยาลัยสงขลานครินทร์'],
+        ['010', 'มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี'],
+        ['011', 'มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ'],
+        ['012', 'สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง'],
+        ['013', 'มหาวิทยาลัยเทคโนโลยีสุรนารี'],
+        ['014', 'มหาวิทยาลัยบูรพา'],
+        ['015', 'มหาวิทยาลัยนเรศวร'],
+        ['016', 'มหาวิทยาลัยมหาสารคาม'],
+        ['017', 'มหาวิทยาลัยทักษิณ'],
+        ['018', 'มหาวิทยาลัยอุบลราชธานี'],
+        ['019', 'มหาวิทยาลัยแม่โจ้'],
+        ['020', 'มหาวิทยาลัยวลัยลักษณ์'],
+        ['024', 'มหาวิทยาลัยแม่ฟ้าหลวง'],
+        ['032', 'ราชวิทยาลัยจุฬาภรณ์'],
+      ];
+
+      const templates = [
+        { fac: 'คณะแพทยศาสตร์', name: 'แพทยศาสตรบัณฑิต', cat: 'แพทย์ / ทันตะ / เภสัช / สัตวแพทย์', baseViews: 48000 },
+        { fac: 'คณะทันตแพทยศาสตร์', name: 'ทันตแพทยศาสตรบัณฑิต', cat: 'แพทย์ / ทันตะ / เภสัช / สัตวแพทย์', baseViews: 36000 },
+        { fac: 'คณะเภสัชศาสตร์', name: 'เภสัชศาสตรบัณฑิต (การบริบาลทางเภสัชกรรม)', cat: 'แพทย์ / ทันตะ / เภสัช / สัตวแพทย์', baseViews: 32000 },
+        { fac: 'คณะพยาบาลศาสตร์', name: 'พยาบาลศาสตรบัณฑิต', cat: 'พยาบาล / สหเวช / สุขภาพ', baseViews: 29000 },
+        { fac: 'คณะสหเวชศาสตร์', name: 'วิทยาศาสตรบัณฑิต สาขาวิชาเทคนิคการแพทย์', cat: 'พยาบาล / สหเวช / สุขภาพ', baseViews: 21000 },
+        { fac: 'คณะวิศวกรรมศาสตร์', name: 'วิศวกรรมศาสตรบัณฑิต สาขาวิชาวิศวกรรมคอมพิวเตอร์และเทคโนโลยีดิจิทัล', cat: 'วิทยาการคอม / IT / ดิจิทัล', baseViews: 44000 },
+        { fac: 'คณะวิศวกรรมศาสตร์', name: 'วิศวกรรมศาสตรบัณฑิต สาขาวิชาวิศวกรรมไฟฟ้า', cat: 'วิศวกรรมศาสตร์', baseViews: 22000 },
+        { fac: 'คณะวิศวกรรมศาสตร์', name: 'วิศวกรรมศาสตรบัณฑิต สาขาวิชาวิศวกรรมเครื่องกล', cat: 'วิศวกรรมศาสตร์', baseViews: 19500 },
+        { fac: 'คณะวิศวกรรมศาสตร์', name: 'วิศวกรรมศาสตรบัณฑิต สาขาวิชาวิศวกรรมอุตสาหการ', cat: 'วิศวกรรมศาสตร์', baseViews: 18000 },
+        { fac: 'คณะวิทยาศาสตร์', name: 'วิทยาศาสตรบัณฑิต สาขาวิชาวิทยาการคอมพิวเตอร์', cat: 'วิทยาการคอม / IT / ดิจิทัล', baseViews: 34000 },
+        { fac: 'คณะเทคโนโลยีสารสนเทศ', name: 'วิทยาศาสตรบัณฑิต สาขาวิชาปัญญาประดิษฐ์และวิทยาการข้อมูล', cat: 'วิทยาการคอม / IT / ดิจิทัล', baseViews: 27000 },
+        { fac: 'คณะพาณิชยศาสตร์และการบัญชี', name: 'บัญชีบัณฑิต (หลักสูตรภาษาไทย)', cat: 'บริหารธุรกิจ / บัญชี', baseViews: 38000 },
+        { fac: 'คณะบริหารธุรกิจ', name: 'บริหารธุรกิจบัณฑิต สาขาวิชาการตลาดดิจิทัล', cat: 'บริหารธุรกิจ / บัญชี', baseViews: 26000 },
+        { fac: 'คณะเศรษฐศาสตร์', name: 'เศรษฐศาสตรบัณฑิต', cat: 'เศรษฐศาสตร์', baseViews: 21500 },
+        { fac: 'คณะนิติศาสตร์', name: 'นิติศาสตรบัณฑิต', cat: 'นิติศาสตร์ / รัฐศาสตร์', baseViews: 31000 },
+        { fac: 'คณะรัฐศาสตร์', name: 'รัฐศาสตรบัณฑิต สาขาวิชาความสัมพันธ์ระหว่างประเทศ', cat: 'นิติศาสตร์ / รัฐศาสตร์', baseViews: 24500 },
+        { fac: 'คณะอักษรศาสตร์ / มนุษยศาสตร์', name: 'อักษรศาสตรบัณฑิต สาขาวิชาภาษาอังกฤษ', cat: 'มนุษยศาสตร์ / ศิลปศาสตร์ / ภาษา', baseViews: 25000 },
+        { fac: 'คณะครุศาสตร์ / ศึกษาศาสตร์', name: 'ครุศาสตรบัณฑิต สาขาวิชาการประถมศึกษา', cat: 'ครุศาสตร์ / ศึกษาศาสตร์', baseViews: 17500 },
+        { fac: 'คณะสถาปัตยกรรมศาสตร์', name: 'สถาปัตยกรรมศาสตรบัณฑิต', cat: 'สถาปัตย์ / ศิลปกรรม / นิเทศศาสตร์', baseViews: 19000 },
+        { fac: 'คณะนิเทศศาสตร์', name: 'นิเทศศาสตรบัณฑิต สาขาวิชาการสื่อสารมวลชนและสื่อดิจิทัล', cat: 'สถาปัตย์ / ศิลปกรรม / นิเทศศาสตร์', baseViews: 26500 },
+        { fac: 'คณะเกษตรศาสตร์', name: 'วิทยาศาสตรบัณฑิต สาขาวิชาเทคโนโลยีการอาหาร', cat: 'เกษตรศาสตร์ / อุตสาหกรรมเกษตร', baseViews: 12000 },
+        { fac: 'คณะวิทยาศาสตร์', name: 'วิทยาศาสตรบัณฑิต สาขาวิชาเคมีประยุกต์', cat: 'วิทยาศาสตร์', baseViews: 11500 },
+      ];
+
+      const programs = [];
+      let counter = 1;
+      // สร้างข้อมูลจำลอง 5,280 หลักสูตรเพื่อให้ทดสอบระบบ Big Data 5,000+ รายการได้ทันที
+      for (let round = 1; round <= 11; round++) {
+        for (const [uId, uName] of universities) {
+          for (const tpl of templates) {
+            const seed = (counter * 9301 + 49297) % 233280;
+            const factor = seed / 233280;
+            const views = Math.max(120, Math.round(tpl.baseViews * (0.18 + factor * 1.15) / (1 + (round - 1) * 0.12)));
+            const viewsDiff = Math.round(views * (0.01 + (seed % 17) * 0.004));
+            const r1 = Math.round(15 + (seed % 60));
+            const r2 = Math.round(10 + ((seed >> 2) % 45));
+            const r3 = Math.round(20 + ((seed >> 3) % 80));
+            const r4 = (seed % 5 === 0) ? Math.round(5 + (seed % 15)) : 0;
+            const pid = `1${uId}01${String(counter).padStart(8, '0')}A`;
+            const suffix = round > 1 ? ` (โครงการที่ ${round})` : ' (ภาษาไทย ปกติ)';
+
+            programs.push({
+              program_id: pid,
+              program_name: `${tpl.name}${suffix}`,
+              faculty: tpl.fac,
+              university: uName,
+              university_id: uId,
+              campus: 'วิทยาเขตหลัก',
+              program_type: round % 4 === 0 ? 'นานาชาติ' : 'ภาษาไทย ปกติ',
+              category: tpl.cat,
+              r1, r2, r3, r4,
+              total_seats: r1 + r2 + r3 + r4,
+              views,
+              views_prev: views - viewsDiff,
+              views_diff: viewsDiff,
+              url: `https://course.mytcas.com/programs/${pid}`
+            });
+            counter++;
+          }
+        }
+      }
+
+      programs.sort((a, b) => b.views - a.views);
+      programs.forEach((p, idx) => { p.rank = idx + 1; });
+
+      return {
+        metadata: {
+          updated_at: new Date().toLocaleString('th-TH'),
+          total_programs: programs.length,
+          total_universities: universities.length,
+          is_demo: true
+        },
+        programs
+      };
+    }
+
+    // =========================================================================
+    // 3. Data Initialization
+    // =========================================================================
+    async function loadDataset() {
+      const badge = document.getElementById('dataSourceBadge');
+      try {
+        const res = await fetch(`./data.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = await res.json();
+        if (!payload.programs || !payload.programs.length) throw new Error('Empty dataset');
+
+        state.allPrograms = payload.programs;
+        state.metadata = payload.metadata || {};
+        badge.textContent = `ข้อมูลจริง (${state.allPrograms.length.toLocaleString()} สาขา)`;
+        badge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
+      } catch (err) {
+        const demo = generateFallbackDataset();
+        state.allPrograms = demo.programs;
+        state.metadata = demo.metadata;
+        badge.textContent = `โหมดจำลอง 5,280 สาขา (รอไฟล์ data.json จาก GitHub Actions)`;
+        badge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30';
+      }
+
+      // Pre-compute search index string for ultra-fast filtering (<15ms on 10,000 rows)
+      for (const p of state.allPrograms) {
+        p._searchStr = `${p.program_id} ${p.program_name} ${p.faculty} ${p.university} ${p.campus || ''}`.toLowerCase();
+      }
+
+      document.getElementById('lastUpdatedText').textContent = state.metadata.updated_at || '-';
+      populateUniversityDropdown();
+      applyFiltersAndRender();
+    }
+
+    function populateUniversityDropdown() {
+      const select = document.getElementById('universityFilter');
+      const counts = new Map();
+      for (const p of state.allPrograms) {
+        counts.set(p.university, (counts.get(p.university) || 0) + 1);
+      }
+      const sortedUnis = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+      const frag = document.createDocumentFragment();
+      for (const [uName, count] of sortedUnis) {
+        const opt = document.createElement('option');
+        opt.value = uName;
+        opt.textContent = `${uName} (${count.toLocaleString()} สาขา)`;
+        frag.appendChild(opt);
+      }
+      select.appendChild(frag);
+    }
+
+    // =========================================================================
+    // 4. Filtering, Sorting & KPI Calculation
+    // =========================================================================
+    function applyFiltersAndRender() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const uni = state.selectedUniversity;
+      const cat = state.selectedCategory;
+
+      const filtered = state.allPrograms.filter(p => {
+        if (uni && p.university !== uni) return false;
+        if (cat && p.category !== cat) return false;
+        if (q && !p._searchStr.includes(q)) return false;
+        return true;
+      });
+
+      // Sort
+      const sortKey = state.sortBy;
+      filtered.sort((a, b) => {
+        switch (sortKey) {
+          case 'views_desc': return b.views - a.views;
+          case 'views_asc': return a.views - b.views;
+          case 'diff_desc': return (b.views_diff || 0) - (a.views_diff || 0);
+          case 'seats_desc': return (b.total_seats || 0) - (a.total_seats || 0);
+          case 'ratio_desc': {
+            const ra = a.total_seats > 0 ? a.views / a.total_seats : 0;
+            const rb = b.total_seats > 0 ? b.views / b.total_seats : 0;
+            return rb - ra;
+          }
+          case 'r1_desc': return (b.r1 || 0) - (a.r1 || 0);
+          case 'r3_desc': return (b.r3 || 0) - (a.r3 || 0);
+          default: return b.views - a.views;
+        }
+      });
+
+      state.filteredPrograms = filtered;
+      state.currentPage = 1;
+
+      updateSummaryCards();
+      updateChart();
+      renderDataView();
+    }
+
+    function updateSummaryCards() {
+      const list = state.filteredPrograms;
+      const totalAll = state.allPrograms.length;
+      let sumViews = 0;
+      let sumDiff = 0;
+      let sumSeats = 0;
+      const uniSet = new Set();
+
+      for (const p of list) {
+        sumViews += p.views || 0;
+        sumDiff += p.views_diff || 0;
+        sumSeats += p.total_seats || 0;
+        uniSet.add(p.university);
+      }
+
+      document.getElementById('statFilteredPrograms').textContent = list.length.toLocaleString();
+      document.getElementById('statTotalPrograms').textContent = `/ ${totalAll.toLocaleString()} สาขา`;
+      document.getElementById('statTotalUniversities').textContent = `ครอบคลุม ${uniSet.size.toLocaleString()} สถาบัน`;
+      document.getElementById('statTotalViews').textContent = sumViews.toLocaleString();
+      document.getElementById('statViewsDiff').textContent = `+${sumDiff.toLocaleString()} วิวจากรอบก่อนหน้า`;
+      document.getElementById('statTotalSeats').textContent = sumSeats.toLocaleString();
+
+      const avgRatio = sumSeats > 0 ? (sumViews / sumSeats).toFixed(1) : '0';
+      document.getElementById('statAvgViewsPerSeat').textContent = `เฉลี่ย ${avgRatio} วิว/ที่นั่ง`;
+
+      if (list.length > 0) {
+        const top = list[0];
+        document.getElementById('statTopCourseName').textContent = top.program_name;
+        document.getElementById('statTopCourseName').title = top.program_name;
+        document.getElementById('statTopCourseUni').textContent = `${top.university} (${top.views.toLocaleString()} วิว)`;
+      } else {
+        document.getElementById('statTopCourseName').textContent = 'ไม่พบสาขาที่ตรงเงื่อนไข';
+        document.getElementById('statTopCourseUni').textContent = '-';
+      }
+    }
+
+    // =========================================================================
+    // 5. Dynamic Top 10 / 25 / 50 Chart
+    // =========================================================================
+    function updateChart() {
+      const ctx = document.getElementById('topViewsChart').getContext('2d');
+      const topSlice = state.filteredPrograms.slice(0, state.chartLimit);
+
+      const filterParts = [];
+      if (state.selectedUniversity) filterParts.push(state.selectedUniversity);
+      if (state.selectedCategory) filterParts.push(state.selectedCategory);
+      if (state.searchQuery) filterParts.push(`"${state.searchQuery}"`);
+      document.getElementById('chartFilterStatus').textContent = filterParts.length ? filterParts.join(' • ') : 'ทั้งประเทศ';
+
+      const labels = topSlice.map((p, i) => `#${i + 1} ${p.program_name.slice(0, 28)} (${p.university.replace('มหาวิทยาลัย', 'ม.')})`);
+      const dataViews = topSlice.map(p => p.views);
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'ยอดผู้เข้าชม (ครั้ง)',
+            data: dataViews,
+            backgroundColor: 'rgba(79, 70, 229, 0.82)',
+            borderColor: 'rgba(67, 56, 202, 1)',
+            borderWidth: 1,
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: state.chartLimit > 15 ? 'x' : 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: (items) => {
+                  const item = topSlice[items[0].dataIndex];
+                  return `${item.program_name}\n${item.faculty} — ${item.university}`;
+                },
+                label: (item) => ` ยอดผู้เข้าชม: ${Number(item.raw).toLocaleString()} ครั้ง (รับรวม ${topSlice[item.dataIndex].total_seats} คน)`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: '#f1f5f9' } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    // =========================================================================
+    // 6. High-Performance Table, Virtual Scroll & Card Rendering
+    // =========================================================================
+    function createRowHtml(p) {
+      const rankBadge = p.rank <= 3
+        ? `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs ${
+            p.rank === 1 ? 'bg-amber-400 text-slate-950' : p.rank === 2 ? 'bg-slate-300 text-slate-900' : 'bg-amber-700 text-white'
+          }">${p.rank}</span>`
+        : `<span class="font-mono text-xs text-slate-500">#${p.rank.toLocaleString()}</span>`;
+
+      const diffHtml = p.views_diff > 0
+        ? `<span class="text-[11px] font-mono text-emerald-600 font-medium block">+${p.views_diff.toLocaleString()}</span>`
+        : '';
+
+      return `
+        <tr class="hover:bg-indigo-50/50 transition">
+          <td class="py-3 px-3 text-center">${rankBadge}</td>
+          <td class="py-3 px-4">
+            <a href="${p.url}" target="_blank" rel="noopener" class="font-semibold text-slate-900 hover:text-indigo-600 transition line-clamp-1">
+              ${escapeHtml(p.program_name)}
+            </a>
+            <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-slate-500">
+              <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded">${p.program_id}</span>
+              <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">${escapeHtml(p.category)}</span>
+              <span>• ${escapeHtml(p.program_type || 'ปกติ')}</span>
+            </div>
+          </td>
+          <td class="py-3 px-3">
+            <div class="font-medium text-slate-800 line-clamp-1">${escapeHtml(p.university)}</div>
+            <div class="text-xs text-slate-500 line-clamp-1">${escapeHtml(p.faculty)}</div>
+          </td>
+          <td class="py-3 px-2 text-center font-mono text-xs ${p.r1 ? 'text-slate-800 font-semibold' : 'text-slate-300'}">${p.r1 || '-'}</td>
+          <td class="py-3 px-2 text-center font-mono text-xs ${p.r2 ? 'text-slate-800 font-semibold' : 'text-slate-300'}">${p.r2 || '-'}</td>
+          <td class="py-3 px-2 text-center font-mono text-xs ${p.r3 ? 'text-slate-800 font-semibold' : 'text-slate-300'}">${p.r3 || '-'}</td>
+          <td class="py-3 px-2 text-center font-mono text-xs ${p.r4 ? 'text-slate-800 font-semibold' : 'text-slate-300'}">${p.r4 || '-'}</td>
+          <td class="py-3 px-3 text-center">
+            <span class="inline-block font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800">${(p.total_seats || 0).toLocaleString()}</span>
+          </td>
+          <td class="py-3 px-4 text-right">
+            <span class="font-mono font-bold text-indigo-600 text-base">${(p.views || 0).toLocaleString()}</span>
+            ${diffHtml}
+          </td>
+        </tr>
+      `;
+    }
+
+    function createCardHtml(p) {
+      return `
+        <div class="border border-slate-200 rounded-xl p-4 hover:shadow-md transition bg-white flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-white">อันดับ #${p.rank.toLocaleString()}</span>
+              <span class="text-xs font-mono text-slate-400">${p.program_id}</span>
+            </div>
+            <a href="${p.url}" target="_blank" rel="noopener" class="font-bold text-slate-900 hover:text-indigo-600 line-clamp-2">
+              ${escapeHtml(p.program_name)}
+            </a>
+            <p class="text-xs text-indigo-600 font-medium mt-1">${escapeHtml(p.university)}</p>
+            <p class="text-xs text-slate-500">${escapeHtml(p.faculty)}</p>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100">
+            <div class="grid grid-cols-4 gap-1 text-center text-[11px] bg-slate-50 p-2 rounded-lg mb-3">
+              <div><span class="text-slate-400 block">รอบ 1</span><strong class="font-mono">${p.r1 || '-'}</strong></div>
+              <div><span class="text-slate-400 block">รอบ 2</span><strong class="font-mono">${p.r2 || '-'}</strong></div>
+              <div><span class="text-slate-400 block">รอบ 3</span><strong class="font-mono">${p.r3 || '-'}</strong></div>
+              <div><span class="text-slate-400 block">รอบ 4</span><strong class="font-mono">${p.r4 || '-'}</strong></div>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-slate-500">รับรวม <strong>${p.total_seats}</strong> คน</span>
+              <div class="text-right">
+                <span class="text-lg font-mono font-bold text-indigo-600">${p.views.toLocaleString()}</span>
+                <span class="text-xs text-slate-500"> วิว</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDataView() {
+      const tableContainer = document.getElementById('tableViewContainer');
+      const virtualViewport = document.getElementById('virtualScrollViewport');
+      const cardContainer = document.getElementById('cardViewContainer');
+      const paginationFooter = document.getElementById('paginationFooter');
+
+      // กรณีเลือกโหมด Virtual Scroll
+      if (state.pageSize === 'virtual' && state.viewMode === 'table') {
+        tableContainer.classList.add('hidden');
+        cardContainer.classList.add('hidden');
+        paginationFooter.classList.add('hidden');
+        virtualViewport.classList.remove('hidden');
+        renderVirtualScroll();
+        return;
+      }
+
+      virtualViewport.classList.add('hidden');
+      paginationFooter.classList.remove('hidden');
+
+      const total = state.filteredPrograms.length;
+      const limit = Number(state.pageSize) || 100;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+      const startIdx = (state.currentPage - 1) * limit;
+      const endIdx = Math.min(startIdx + limit, total);
+      const pageItems = state.filteredPrograms.slice(startIdx, endIdx);
+
+      if (state.viewMode === 'table') {
+        tableContainer.classList.remove('hidden');
+        cardContainer.classList.add('hidden');
+        document.getElementById('tableBody').innerHTML = pageItems.length
+          ? pageItems.map(createRowHtml).join('')
+          : `<tr><td colspan="9" class="py-12 text-center text-slate-400">ไม่พบข้อมูลสาขาวิชาที่ค้นหา</td></tr>`;
+      } else {
+        tableContainer.classList.add('hidden');
+        cardContainer.classList.remove('hidden');
+        cardContainer.innerHTML = pageItems.length
+          ? pageItems.map(createCardHtml).join('')
+          : `<div class="col-span-full py-12 text-center text-slate-400">ไม่พบข้อมูลสาขาวิชาที่ค้นหา</div>`;
+      }
+
+      // Update Pagination Controls
+      document.getElementById('paginationInfo').textContent = total
+        ? `แสดง ${(startIdx + 1).toLocaleString()} - ${endIdx.toLocaleString()} จากทั้งหมด ${total.toLocaleString()} สาขา`
+        : 'ไม่พบรายการที่ตรงกับตัวกรอง';
+      document.getElementById('pageIndicator').textContent = `${state.currentPage} / ${totalPages}`;
+      document.getElementById('firstPageBtn').disabled = state.currentPage <= 1;
+      document.getElementById('prevPageBtn').disabled = state.currentPage <= 1;
+      document.getElementById('nextPageBtn').disabled = state.currentPage >= totalPages;
+      document.getElementById('lastPageBtn').disabled = state.currentPage >= totalPages;
+    }
+
+    function renderVirtualScroll() {
+      const viewport = document.getElementById('virtualScrollViewport');
+      const spacer = document.getElementById('virtualScrollSpacer');
+      const tbody = document.getElementById('virtualTableBody');
+      const total = state.filteredPrograms.length;
+      const rowH = state.virtualRowHeight;
+
+      spacer.style.height = `${total * rowH}px`;
+
+      const scrollTop = viewport.scrollTop;
+      const visibleCount = Math.ceil(viewport.clientHeight / rowH) + 10;
+      const startIndex = Math.max(0, Math.floor(scrollTop / rowH) - 5);
+      const endIndex = Math.min(total, startIndex + visibleCount);
+
+      const visibleSlice = state.filteredPrograms.slice(startIndex, endIndex);
+      tbody.parentElement.style.transform = `translateY(${startIndex * rowH}px)`;
+      tbody.innerHTML = visibleSlice.map(createRowHtml).join('');
+    }
+
+    // =========================================================================
+    // 7. Export to CSV (UTF-8 with BOM สำหรับเปิดใน Excel ภาษาไทยไม่เพี้ยน)
+    // =========================================================================
+    function exportToCsv() {
+      const rows = state.filteredPrograms;
+      if (!rows.length) {
+        alert('ไม่มีข้อมูลสำหรับส่งออก');
+        return;
+      }
+
+      const headers = [
+        'อันดับประเทศ',
+        'รหัสหลักสูตร',
+        'ชื่อหลักสูตร/สาขาวิชา',
+        'คณะ',
+        'มหาวิทยาลัย',
+        'วิทยาเขต',
+        'ประเภทหลักสูตร',
+        'กลุ่มคณะ',
+        'รอบ 1 Portfolio',
+        'รอบ 2 Quota',
+        'รอบ 3 Admission',
+        'รอบ 4 Direct Admission',
+        'จำนวนรับรวม',
+        'ยอดผู้เข้าชม (ครั้ง)',
+        'ยอดวิวที่เพิ่มขึ้น (+Diff)',
+        'ลิงก์ myTCAS'
+      ];
+
+      const escapeCsv = (val) => {
+        const s = String(val ?? '').replace(/"/g, '""');
+        return `"${s}"`;
+      };
+
+      const csvLines = [headers.map(escapeCsv).join(',')];
+      for (const p of rows) {
+        csvLines.push([
+          p.rank,
+          p.program_id,
+          p.program_name,
+          p.faculty,
+          p.university,
+          p.campus || '',
+          p.program_type || '',
+          p.category || '',
+          p.r1 || 0,
+          p.r2 || 0,
+          p.r3 || 0,
+          p.r4 || 0,
+          p.total_seats || 0,
+          p.views || 0,
+          p.views_diff || 0,
+          p.url
+        ].map(escapeCsv).join(','));
+      }
+
+      // เติม \uFEFF (UTF-8 BOM) เพื่อให้ Microsoft Excel อ่านภาษาไทยได้ถูกต้อง 100%
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `myTCAS_ViewTracker_${dateStr}_${rows.length}courses.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // =========================================================================
+    // 8. Countdown Timer สำหรับรอบ 06:00 น. และ 18:00 น. เวลาไทย
+    // =========================================================================
+    function startCountdownTimer() {
+      const el = document.getElementById('countdownTimer');
+      setInterval(() => {
+        const now = new Date();
+        // แปลงเวลาปัจจุบันเป็นเวลาประเทศไทย (UTC+7)
+        const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const thNow = new Date(utcMs + (7 * 3600000));
+
+        const nextTarget = new Date(thNow);
+        const hr = thNow.getHours();
+
+        if (hr < 6) {
+          nextTarget.setHours(6, 0, 0, 0);
+        } else if (hr < 18) {
+          nextTarget.setHours(18, 0, 0, 0);
+        } else {
+          nextTarget.setDate(nextTarget.getDate() + 1);
+          nextTarget.setHours(6, 0, 0, 0);
+        }
+
+        const diffSec = Math.max(0, Math.floor((nextTarget - thNow) / 1000));
+        const h = String(Math.floor(diffSec / 3600)).padStart(2, '0');
+        const m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
+        const s = String(diffSec % 60).padStart(2, '0');
+        el.textContent = `${h}:${m}:${s}`;
+      }, 1000);
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // =========================================================================
+    // 9. Event Listeners (Debounced Search & Controls)
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDataset();
+      startCountdownTimer();
+
+      // Debounce Search (150ms)
+      let debounceTimer = null;
+      const searchInput = document.getElementById('searchInput');
+      const clearBtn = document.getElementById('clearSearchBtn');
+
+      searchInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        clearBtn.classList.toggle('hidden', !val);
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          state.searchQuery = val;
+          applyFiltersAndRender();
+        }, 150);
+      });
+
+      clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearBtn.classList.add('hidden');
+        state.searchQuery = '';
+        applyFiltersAndRender();
+      });
+
+      document.getElementById('universityFilter').addEventListener('change', (e) => {
+        state.selectedUniversity = e.target.value;
+        applyFiltersAndRender();
+      });
+
+      document.getElementById('categoryFilter').addEventListener('change', (e) => {
+        state.selectedCategory = e.target.value;
+        applyFiltersAndRender();
+      });
+
+      document.getElementById('sortSelect').addEventListener('change', (e) => {
+        state.sortBy = e.target.value;
+        applyFiltersAndRender();
+      });
+
+      document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+        state.pageSize = e.target.value === 'virtual' ? 'virtual' : Number(e.target.value);
+        state.currentPage = 1;
+        renderDataView();
+      });
+
+      document.getElementById('virtualScrollViewport').addEventListener('scroll', () => {
+        if (state.pageSize === 'virtual') {
+          requestAnimationFrame(renderVirtualScroll);
+        }
+      });
+
+      // View Mode Toggle
+      const viewTableBtn = document.getElementById('viewTableBtn');
+      const viewCardBtn = document.getElementById('viewCardBtn');
+      viewTableBtn.addEventListener('click', () => {
+        state.viewMode = 'table';
+        viewTableBtn.className = 'px-3 py-1.5 rounded-md bg-indigo-600 text-white font-medium';
+        viewCardBtn.className = 'px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 font-medium';
+        renderDataView();
+      });
+      viewCardBtn.addEventListener('click', () => {
+        state.viewMode = 'card';
+        viewCardBtn.className = 'px-3 py-1.5 rounded-md bg-indigo-600 text-white font-medium';
+        viewTableBtn.className = 'px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 font-medium';
+        renderDataView();
+      });
+
+      // Chart Limit Buttons (Top 10 / 25 / 50)
+      document.querySelectorAll('.chart-limit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.chartLimit = Number(btn.dataset.chartLimit);
+          document.querySelectorAll('.chart-limit-btn').forEach(b => {
+            b.className = 'chart-limit-btn px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900';
+          });
+          btn.className = 'chart-limit-btn px-3 py-1.5 rounded-md bg-indigo-600 text-white shadow-sm';
+          updateChart();
+        });
+      });
+
+      document.getElementById('toggleChartBtn').addEventListener('click', () => {
+        document.getElementById('chartWrapper').classList.toggle('hidden');
+      });
+
+      // Reset Filters
+      document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+        searchInput.value = '';
+        clearBtn.classList.add('hidden');
+        document.getElementById('universityFilter').value = '';
+        document.getElementById('categoryFilter').value = '';
+        document.getElementById('sortSelect').value = 'views_desc';
+        state.searchQuery = '';
+        state.selectedUniversity = '';
+        state.selectedCategory = '';
+        state.sortBy = 'views_desc';
+        applyFiltersAndRender();
+      });
+
+      // Pagination Buttons
+      document.getElementById('firstPageBtn').addEventListener('click', () => {
+        state.currentPage = 1;
+        renderDataView();
+      });
+      document.getElementById('prevPageBtn').addEventListener('click', () => {
+        if (state.currentPage > 1) {
+          state.currentPage--;
+          renderDataView();
+        }
+      });
+      document.getElementById('nextPageBtn').addEventListener('click', () => {
+        const limit = Number(state.pageSize) || 100;
+        const maxPage = Math.ceil(state.filteredPrograms.length / limit);
+        if (state.currentPage < maxPage) {
+          state.currentPage++;
+          renderDataView();
+        }
+      });
+      document.getElementById('lastPageBtn').addEventListener('click', () => {
+        const limit = Number(state.pageSize) || 100;
+        state.currentPage = Math.max(1, Math.ceil(state.filteredPrograms.length / limit));
+        renderDataView();
+      });
+
+      // Export CSV
+      document.getElementById('exportCsvBtn').addEventListener('click', exportToCsv);
+    });
+  </script>
+</body>
+</html>
