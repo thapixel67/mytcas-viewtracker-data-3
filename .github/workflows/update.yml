@@ -2,23 +2,23 @@ name: myTCAS ViewTracker Auto-Update
 
 on:
   schedule:
-    # 06:00 น. เวลาไทย (23:00 UTC ของวันก่อนหน้า)
+    # 06:00 น. เวลาไทย (23:00 UTC)
     - cron: '0 23 * * *'
-    # 18:00 น. เวลาไทย (11:00 UTC ของวันเดียวกัน)
+    # 18:00 น. เวลาไทย (11:00 UTC)
     - cron: '0 11 * * *'
-  workflow_dispatch: # ปุ่มกดสั่งรันด้วยตัวเองผ่านหน้า GitHub Actions
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
   group: mytcas-scraper-group
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   scrape-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
 
     steps:
       - name: 1. Checkout Repository
@@ -41,8 +41,9 @@ jobs:
       - name: 4. Run Nationwide myTCAS Scraper Pipeline
         env:
           TZ: Asia/Bangkok
+          PYTHONUNBUFFERED: "1"
         run: |
-          python scraper.py
+          python -u scraper.py
 
       - name: 5. Commit and Push Updated Data
         env:
